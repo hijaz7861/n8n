@@ -128,6 +128,11 @@ interface WebhookExecutionDataChanges {
 	};
 }
 
+interface WebhookContinuationResult {
+	didSendResponse: boolean;
+	shouldContinueWorkflowExecution: boolean;
+}
+
 const deferCleanupUntilStreamEnds = (
 	stream: Readable,
 	res: express.Response,
@@ -630,6 +635,40 @@ export async function invokeWebhook({
 	}
 }
 
+/** Stops OAuth webhook execution when required trigger credentials are not ready. */
+export async function checkTriggerCredentialGate({
+	workflowStartNode,
+	additionalData,
+	res,
+	didSendResponse,
+	responseCallback,
+}: {
+	workflowStartNode: INode;
+	additionalData: IWorkflowExecuteAdditionalData;
+	res: express.Response;
+	didSendResponse: boolean;
+	responseCallback: (
+		error: Error | null,
+		data: IWebhookResponseCallbackData | WebhookResponse,
+	) => void;
+}): Promise<WebhookContinuationResult> {
+	if (didSendResponse || res.headersSent || !shouldEstablishTriggerIdentity(workflowStartNode)) {
+		return { didSendResponse, shouldContinueWorkflowExecution: true };
+	}
+
+	const credentialGate = await additionalData.checkTriggerCredentialStatus?.();
+	if (!credentialGate || credentialGate.readyToExecute) {
+		return { didSendResponse, shouldContinueWorkflowExecution: true };
+	}
+
+	responseCallback(null, {
+		data: credentialGate,
+		responseCode: 428,
+	});
+
+	return { didSendResponse: true, shouldContinueWorkflowExecution: false };
+}
+
 /**
  * Reconciles a pre-seeded execution stack (identity/context trigger flows) with the
  * webhook node's real output. No-op unless the start node seeded execution data.
@@ -1096,17 +1135,15 @@ export async function executeWebhook(
 		// user's resolvable (private) credentials are still unconnected, responding
 		// 428 Precondition Required with the missing-credential list and a signed
 		// connect link for each.
-		if (!didSendResponse && !res.headersSent && shouldEstablishTriggerIdentity(workflowStartNode)) {
-			const credentialGate = await additionalData.checkTriggerCredentialStatus?.();
-			if (credentialGate && !credentialGate.readyToExecute) {
-				responseCallback(null, {
-					data: credentialGate,
-					responseCode: 428,
-				});
-				didSendResponse = true;
-				return;
-			}
-		}
+		const credentialGate = await checkTriggerCredentialGate({
+			workflowStartNode,
+			additionalData,
+			res,
+			didSendResponse,
+			responseCallback,
+		});
+		didSendResponse = credentialGate.didSendResponse;
+		if (!credentialGate.shouldContinueWorkflowExecution) return;
 
 		// For "onReceived" mode, we need to defer response sending until after the execution
 		// is created, so that `$execution.id` is available in response data expressions.

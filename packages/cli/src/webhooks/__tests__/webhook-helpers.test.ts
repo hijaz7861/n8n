@@ -81,6 +81,7 @@ import {
 	executeWebhook,
 	_privateGetWebhookErrorMessage,
 	invokeWebhook,
+	checkTriggerCredentialGate,
 } from '../webhook-helpers';
 import { WebhookService } from '../webhook.service';
 import type { IWebhookResponseCallbackData, WebhookRequest } from '../webhook.types';
@@ -1323,6 +1324,32 @@ describe('invokeWebhook', () => {
 			'nodeFetchedData',
 			expect.any(Object),
 		);
+	});
+});
+
+describe('checkTriggerCredentialGate', () => {
+	const oauthWebhook = mock<INode>({
+		name: 'Webhook',
+		type: WEBHOOK_NODE_TYPE,
+		parameters: { authentication: 'n8nOAuth2' },
+	});
+
+	it.each([
+		{ name: 'a response was sent', didSendResponse: true, headersSent: false },
+		{ name: 'headers were sent', didSendResponse: false, headersSent: true },
+	])('skips the gate when $name', async ({ didSendResponse, headersSent }) => {
+		const checkTriggerCredentialStatus = vi.fn();
+
+		const result = await checkTriggerCredentialGate({
+			workflowStartNode: oauthWebhook,
+			additionalData: mock<IWorkflowExecuteAdditionalData>({ checkTriggerCredentialStatus }),
+			res: mock<express.Response>({ headersSent }),
+			didSendResponse,
+			responseCallback: vi.fn(),
+		});
+
+		expect(checkTriggerCredentialStatus).not.toHaveBeenCalled();
+		expect(result.shouldContinueWorkflowExecution).toBe(true);
 	});
 });
 
