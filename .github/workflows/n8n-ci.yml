@@ -1,0 +1,56 @@
+name: n8n CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  install-build-test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.2
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Versions
+        run: |
+          node --version
+          pnpm --version
+
+      - name: Frozen install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build n8n
+        run: pnpm build:n8n
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Governance evidence
+        if: always()
+        run: |
+          echo "CI_ENVIRONMENT: github-actions"
+          echo "INSTALL: PERFORMED"
+          echo "LOCKFILE_CHANGE: NOT_PERFORMED"
+          echo "BUILD: PERFORMED"
+          echo "TESTS: PERFORMED"
+          echo "DEPLOYMENT: NOT_PERFORMED"
+          echo "PRODUCTION_CLAIM: FALSE"
