@@ -42,8 +42,8 @@ jobs:
 
       - name: Verify sqlite3
         run: |
-          node -e "const p=require('./node_modules/sqlite3/package.json'); console.log('sqlite3='+p.version)"
-          node -e "const sqlite3=require('sqlite3'); console.log('sqlite3_load=PASS')"
+          pnpm --filter n8n exec node -e "const p=require('sqlite3/package.json'); console.log('sqlite3='+p.version)"
+          pnpm --filter n8n exec node -e "require('sqlite3'); console.log('sqlite3_load=PASS')"
 
       - name: Build n8n
         run: pnpm build:n8n
