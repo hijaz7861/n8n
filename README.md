@@ -1,3 +1,5 @@
+> **Local fork maintainer:** Muhammad Naeem Khan (`hijaz7861`). This repository is a fork of [n8n-io/n8n](https://github.com/n8n-io/n8n); upstream authorship, trademarks, and license terms remain with their respective rights holders.
+
 ![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
 
 # n8n – The Platform for AI Agents and Workflow Automation
